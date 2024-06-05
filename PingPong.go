@@ -5,6 +5,7 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-runewidth"
 	"os"
+	"sync"
 )
 
 const (
@@ -20,6 +21,9 @@ var (
 	paddle1 *Paddle
 	paddle2 *Paddle
 )
+
+var mutex sync.M
+utex
 
 // / this is not written by me this comes with tcell library
 func emitStr(screen tcell.Screen, x, y int, style tcell.Style, str string) {
@@ -49,7 +53,7 @@ func PrintGameObjectPaddles(screen tcell.Screen, x, y, width, height int, charac
 }
 
 // / this is main manu screen where welcome text is located
-func displayWelcomeSceen(screen tcell.Screen) {
+func drawWelcomeSceen(screen tcell.Screen) {
 	w, h := screen.Size()
 	screen.Clear()
 	welcomeText := "Welcome to my ping pong game"
@@ -69,7 +73,7 @@ func displayWelcomeSceen(screen tcell.Screen) {
 }
 
 // / this is function to display game objects (game screen) paddles, ball
-func displayGameScreen(screen tcell.Screen) {
+func drawGameScreen(screen tcell.Screen) {
 	screen.Clear()
 
 	PrintGameObjectPaddles(screen, paddle1.x, paddle1.y, paddle1.width, paddle1.height, PaddleSymbol)
@@ -82,38 +86,90 @@ func main() {
 
 	screen := InintScreen()
 
-	displayWelcomeSceen(screen)
+	drawWelcomeSceen(screen)
 	InitGameState(screen)
 
-	//PrintGameObjectPaddles(screen, 0, 0, 2, 5, '&')
 	isWelcomeScreen := true
+
 	for {
+
+		if isWelcomeScreen {
+			drawWelcomeSceen(screen)
+		} else {
+			drawGameScreen(screen)
+		}
+
 		switch ev := screen.PollEvent().(type) {
 
 		case *tcell.EventKey:
+
 			if ev.Key() == tcell.KeyEscape {
 				screen.Fini()
 				os.Exit(0)
 			}
 			if ev.Key() == tcell.KeyEnter {
+
 				if isWelcomeScreen {
-					displayGameScreen(screen)
+					drawGameScreen(screen)
 					isWelcomeScreen = false
+
 				} else {
 					screen.Beep()
-					displayWelcomeSceen(screen)
+					drawWelcomeSceen(screen)
 					isWelcomeScreen = true
+					positionPaddles(screen)
 				}
 			}
+			if ev.Key() == tcell.KeyUp {
+				paddle2.y--
+			}
+			if ev.Key() == tcell.KeyDown {
+				paddle2.y++
+
+			}
+			if ev.Rune() == 'w' {
+				paddle1.y--
+
+			}
+			if ev.Rune() == 's' {
+				paddle1.y++
+
+			}
+
 		case *tcell.EventResize:
 			if isWelcomeScreen {
-				displayWelcomeSceen(screen)
+				drawWelcomeSceen(screen)
 			} else {
-				InitGameState(screen) /// when sceen size is changed I need to call screen again to update widht and height
-				displayGameScreen(screen)
+				positionPaddles(screen) /// when sceen size is changed I need to call screen again to update widht and height
+				drawGameScreen(screen)
 			}
 		}
 
+	}
+}
+
+func InitUserInput(screen tcell.Screen) {
+	for {
+		switch ev := screen.PollEvent().(type) {
+
+		case *tcell.EventKey:
+
+			if ev.Key() == tcell.KeyUp {
+				paddle2.y--
+			}
+			if ev.Key() == tcell.KeyDown {
+				paddle2.y++
+
+			}
+			if ev.Rune() == 'w' {
+				paddle1.y--
+
+			}
+			if ev.Rune() == 's' {
+				paddle1.y++
+
+			}
+		}
 	}
 }
 
@@ -135,6 +191,18 @@ func InintScreen() tcell.Screen {
 	screen.SetStyle(defStyle)
 
 	return screen
+}
+
+// / created this separate function because I did not want to call InitGameState every time I wanted to re-render object (this is mainly for resizing)
+func positionPaddles(screen tcell.Screen) {
+	width, height := screen.Size()
+	paddleStart := height/2 - PaddleHeight/2
+
+	paddle1.x = 0
+	paddle1.y = paddleStart
+
+	paddle2.x = width - 1
+	paddle2.y = paddleStart
 }
 
 // / in here I am creating initializing game objects for displaying game object function
